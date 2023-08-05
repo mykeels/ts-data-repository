@@ -10,7 +10,7 @@ import mongoose, {
   PaginateModel,
 } from "mongoose";
 
-import { Archived, Keys, Populate, Projections, Model } from "./mongodb.types";
+import { Archived, Keys, Populate, Projections, Model } from "./mongoose.types";
 import {
   IRepository,
   Sort,
