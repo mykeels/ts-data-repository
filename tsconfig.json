@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "NodeNext",
+    "experimentalDecorators": true,
+    "outDir": "dist",
+    "strict": true,
+    "esModuleInterop": true,
+    "noImplicitAny": true,
+    "noUncheckedIndexedAccess": true,
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "typeRoots": ["node_modules/@types", "typings/*.d.ts", "reflect-metadata"]
+  },
+  "include": ["src", "typings"],
+  "exclude": ["node_modules", "**/*.test.ts"]
+}
