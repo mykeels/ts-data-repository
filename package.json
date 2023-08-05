@@ -1,0 +1,21 @@
+{
+  "name": "ts-data-repository",
+  "version": "1.0.0",
+  "description": "Simple repositories for data access in typescript",
+  "main": "dist/index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "mongoose": "^7.2.0",
+    "mongoose-paginate-v2": "^1.7.1"
+  },
+  "devDependencies": {
+    "tsup": "^6.7.0",
+    "tsx": "^3.12.7",
+    "typescript": "^5.0.4"
+  },
+  "keywords": [],
+  "author": "mykeels",
+  "license": "MIT"
+}
