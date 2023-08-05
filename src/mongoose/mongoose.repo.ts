@@ -17,6 +17,7 @@ import {
   PaginatedQuery,
   Paginated,
 } from "../repo.interface";
+import { DEFAULT_SORT } from "./mongoose.consts";
 
 const makeError = (message: string, name?: string, cause?: any): Error => {
   const error = new Error(message);
@@ -259,7 +260,7 @@ export class MongoDBRepository<TModel extends Model<{}>>
     query: FilterQuery<TModel>,
     options?: ExtendQuery<TModel>
   ): Promise<HydratedDocument<TModel>[]> {
-    const sort = options?.sort || { createdAt: "descending" };
+    const sort = options?.sort || DEFAULT_SORT;
     const archived = this.convertArchived(options?.archived || false);
     return this.model
       .find({
@@ -289,13 +290,13 @@ export class MongoDBRepository<TModel extends Model<{}>>
     options?: ExtendQuery<TModel>
   ): Promise<Paginated<HydratedDocument<TModel>>> {
     const query = pagination.query;
-    const page = Number(query.page) - 1 || 0;
-    const limit = Number(query.limit) || 20;
+    const page = Number(pagination.page) - 1 || 0;
+    const limit = Number(pagination.limit) || 20;
     const offset = page * limit;
-    const sort = options?.sort || { createdAt: "descending" };
+    const sort = options?.sort || DEFAULT_SORT;
     const archived = this.convertArchived(options?.archived || false);
     const dbQuery = {
-      ...query.conditions,
+      ...query,
       ...(!archived
         ? { deletedAt: undefined }
         : { deletedAt: { $ne: undefined } }),
