@@ -11,9 +11,10 @@ interface IWritableRepository<
   TModel extends {},
   TSession,
   TQueryable,
+  TInsertable,
   TUpdatable
 > extends ISessionRepository<TSession> {
-  create(attributes: Partial<TModel>): Promise<TModel>;
+  create(attributes: TInsertable): Promise<TModel>;
   update(condition: TQueryable, update: TUpdatable): Promise<TModel>;
   updateMany(condition: TQueryable, update: TUpdatable): Promise<TModel[]>;
   softDelete(condition: TQueryable): Promise<TModel>;
@@ -45,10 +46,17 @@ export interface IRepository<
   TModel extends {},
   TSession,
   TQueryable,
+  TInsertable,
   TUpdatable,
   TExtendQueryable
 > extends IReadableRepository<TModel, TSession, TQueryable, TExtendQueryable>,
-    IWritableRepository<TModel, TSession, TQueryable, TUpdatable> {}
+    IWritableRepository<
+      TModel,
+      TSession,
+      TQueryable,
+      TInsertable,
+      TUpdatable
+    > {}
 
 export type Paginated<T> = {
   data: T[];

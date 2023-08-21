@@ -1,24 +1,8 @@
-import "mongoose-paginate-v2";
+import db, { Knex } from "knex";
+import { IRepository } from "../repo.interface";
+import { ExtendQuery, Model, Table } from "./knex.types";
 
-import mongoose, {
-  ClientSession,
-  FilterQuery,
-  HydratedDocument,
-  Schema,
-  UpdateQuery,
-  UpdateWithAggregationPipeline,
-  PaginateModel,
-} from "mongoose";
-
-import { Archived, Keys, Populate, Projections, Model } from "./mongoose.types";
-import {
-  IRepository,
-  Sort,
-  PaginatedQuery,
-  Paginated,
-} from "../repo.interface";
-import { DEFAULT_SORT } from "./mongoose.consts";
-
+db({}).transaction();
 const makeError = (message: string, name?: string, cause?: any): Error => {
   const error = new Error(message);
   if (name) {
@@ -30,44 +14,30 @@ const makeError = (message: string, name?: string, cause?: any): Error => {
   return error;
 };
 
-type ExtendQuery<TModel extends Model<{}>> = {
-  projections?: Projections<TModel>;
-  archived?: Archived;
-  populate?: Populate<TModel>;
-  sort?: Sort;
-};
-
-export class MongoDBRepository<TModel extends Model<{}>>
+export class KnexRepository<TModel extends Model<{}>, TModelName extends string>
   implements
     IRepository<
-      TModel,
-      ClientSession,
-      FilterQuery<TModel>,
-      Partial<TModel>,
-      UpdateWithAggregationPipeline | UpdateQuery<TModel>,
+      Table.Composite<TModel>,
+      Knex.Transaction<TModel>,
+      Knex.QueryBuilder<Table.Composite<TModel>>,
+      Table.Insertable<TModel>,
+      Table.Updatable<TModel>,
       ExtendQuery<TModel>
     >
 {
-  name: string;
-  schema: Schema;
-  session: ClientSession | null;
-  model: PaginateModel<TModel>;
+  query: Knex.QueryBuilder<Table.Composite<TModel>>;
+  transaction: Knex.Transaction<TModel> | null;
+  model: TModelName;
 
-  constructor(name: string, schema: Schema);
-  constructor(name: string, model: PaginateModel<TModel>);
-  constructor(name: string, modelOrSchema: Schema | PaginateModel<TModel>) {
-    this.name = name;
-    if (modelOrSchema instanceof Schema) {
-      const schema = modelOrSchema;
-      this.schema = schema;
-      this.model = (mongoose.models[name] ||
-        mongoose.model(name, schema)) as PaginateModel<TModel>;
-    } else {
-      this.model = modelOrSchema;
-      this.schema = modelOrSchema.schema;
-    }
-
-    this.session = null;
+  constructor(
+    model: TModelName,
+    getQuery: (
+      model: string
+    ) => Knex.QueryBuilder<Table.Composite<TModel>> = db({})
+  ) {
+    this.query = getQuery(model);
+    this.model = model;
+    this.transaction = null;
   }
 
   /**
@@ -91,13 +61,10 @@ export class MongoDBRepository<TModel extends Model<{}>>
   }
 
   /**
-   * Connects to a DB Session
+   * Connects to a DB Transaction
    */
-  connectDBSession(session: ClientSession) {
-    this.session = session;
-    if (session && !session.inTransaction()) {
-      session.startTransaction();
-    }
+  connectDBSession(transaction: Knex.Transaction<TModel>) {
+    this.transaction = transaction;
     return this;
   }
 
@@ -105,25 +72,29 @@ export class MongoDBRepository<TModel extends Model<{}>>
    * Disconnects from a DB Session
    */
   disconnectDBSession() {
-    this.session = null;
+    this.transaction = null;
     return this;
   }
+
+  private withTransaction = (
+    query: Knex.QueryBuilder<Table.Composite<TModel>>
+  ) => {
+    if (this.transaction) {
+      return query.transacting(this.transaction);
+    }
+    return query;
+  };
 
   /**
    * Creates one or more documents.
    */
-  async create(attributes: Partial<TModel>): Promise<HydratedDocument<TModel>> {
-    const [doc] = await this.model.create([attributes], {
-      session: this.session,
-    });
-    return doc!.save({ session: this.session }).catch((err) => {
-      if (err && err.code === 11000) {
-        return Promise.reject(
-          makeError(`${this.name} exists already`, "DuplicateModelError")
-        );
-      }
-      return Promise.reject(err);
-    });
+  async create(
+    attributes: Table.Insertable<TModel>
+  ): Promise<Table.Composite<TModel>> {
+    const [doc] = await this.withTransaction(
+      this.query.insert(attributes, "*")
+    );
+    return doc;
   }
 
   /**
@@ -132,11 +103,27 @@ export class MongoDBRepository<TModel extends Model<{}>>
    * @returns {Promise<TModel>}
    */
   async byID(
-    _id: string,
-    projections?: Projections<TModel>,
-    archived?: Archived
-  ): Promise<HydratedDocument<TModel>> {
-    archived = this.convertArchived(archived || false);
+    id: string,
+    options?: ExtendQuery<TModel>
+  ): Promise<Table.Composite<TModel>> {
+    const select = options?.populate || ["*"];
+    const archived = this.convertArchived(options?.archived || false);
+    this.query
+      .where({
+        id,
+        ...(!archived
+          ? { deleted_at: undefined }
+          : { deleted_at: { $ne: undefined } }),
+      })
+      .select(...select)
+      .then((result) => {
+        if (!result) {
+          return Promise.reject(
+            makeError(`${this.name} not found`, "ModelNotFoundError")
+          );
+        }
+        return result;
+      });
     return (
       this.model
         // @ts-ignore
